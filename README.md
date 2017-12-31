@@ -6,7 +6,7 @@ Service to allow using of unmodified [Google Speech](https://cloud.google.com/sp
 
 * Richer client support
 
-Microsoft [Cognitive Services speech APIs](https://azure.microsoft.com/en-us/services/cognitive-services/speech/) do not provide any client SDKs. Instead, you must rely on community built or build your own. For example, if you are building a C/C++ based application, you can use [this](https://github.com/technicianted/libmsspeech) open source client library.
+Microsoft [Cognitive Services speech APIs](https://azure.microsoft.com/en-us/services/cognitive-services/speech/) do not provide any client SDKs. Instead, you must rely on community built or build your own. For example, if you are building a C/C++ based application, you can use [libmsspeech](https://github.com/technicianted/libmsspeech) open source client library.
 
 On the other hande, Google provides an extensive set of client libraries for multiple platform. At the time of this writing, they support C#, Go, Java, Node.js, PHP, Python and Ruby.
 
@@ -25,6 +25,8 @@ This is the very first version of the service. It only works.
 * Microsoft Speech APIs do not support word level timing. `msspeech-gbridge` will not error when it is requested, but it will not return them.
 * Microsoft subscription key has to be supplied at the service, not by the client. WiP to supply it by clients.
 * Microsoft Speech APIs support `conversational` mode, which is not available in Google APIs.
+* Differences in underlying speech recognition parametesr should be evaluated. For example, timeouts and segmentation.
+* Support text to speech APIs.
 * Lots of documentation!
 
 ## Building from source
