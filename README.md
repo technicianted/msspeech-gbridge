@@ -27,6 +27,8 @@ This is the very first version of the service. It only works.
 * Microsoft Speech APIs support `conversational` mode, which is not available in Google APIs.
 * Differences in underlying speech recognition parametesr should be evaluated. For example, timeouts and segmentation.
 * Support text to speech APIs.
+* Implement the two remaining Google Speech APIs: `Recognize` and `LongRunningRecognize`.
+* Package in a Docker container.
 * Lots of documentation!
 
 ## Building from source
