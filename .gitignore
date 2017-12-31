@@ -30,3 +30,9 @@
 *.exe
 *.out
 *.app
+
+# Cmake builds
+build/
+
+# google creds
+creds.json
