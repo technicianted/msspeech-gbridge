@@ -64,7 +64,7 @@ make
 
 ## Using
 
-Example usage using varios Google SDKs can be found [here](https://github.com/technicianted/msspeech-gbridge/examples/). 
+Example usage using varios Google SDKs can be found [here](https://github.com/technicianted/msspeech-gbridge/tree/master/examples/). 
 
 ### As a standalone service
 
