@@ -99,7 +99,10 @@ if __name__ == '__main__':
 
     chan = None
     if args.endpoint != None:
+        print('Using msspeech-bridge at {}'.format(args.endpoint))
         chan = grpc.insecure_channel(args.endpoint)
+    else:
+        print('Using default Google API')
 
     if args.path.startswith('gs://'):
         transcribe_gcs(args.path, chan)

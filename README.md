@@ -71,7 +71,8 @@ make
 
 ## Using
 
-Example usage using varios Google SDKs can be found [here](https://github.com/technicianted/msspeech-gbridge/tree/master/examples/):
+Example usage using various Google SDKs can be found [here](https://github.com/technicianted/msspeech-gbridge/tree/master/examples/):
+* [C#](https://github.com/technicianted/msspeech-gbridge/tree/master/examples/csharp)
 * [Go](https://github.com/technicianted/msspeech-gbridge/tree/master/examples/go)
 * [Python](https://github.com/technicianted/msspeech-gbridge/tree/master/examples/python) 
 
