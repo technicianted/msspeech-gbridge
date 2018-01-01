@@ -28,16 +28,52 @@ all copies or substantial portions of the Software.
 class MSSpeechSession;
 class RecognitionSession;
 
+/**
+ * \brief Factory class to create and manage the lifetime of MSSpeechSession.
+ * 
+ * This class creates and and monitors instances of MSSpeechSession as they are used.
+ * If a connection is closed, the corresponding MSSpeechSession object is removed. It
+ * maintains a list per request URL since it encodes the session parameters. Instances
+ * are then reused as long as their connections are open.
+ */
 class MSSpeechSessionFactory
 {
 public:
+    /**
+     * \brief Construct a new session factory.
+     * 
+     * \param msspeechSubscriptionKey Microsoft Speech API subscription key to be used.
+     * \param maxSession Maximum number of simultaneos sessions.
+     */
     MSSpeechSessionFactory(const std::string &msspeechSubscriptionKey, int maxSessions);
     ~MSSpeechSessionFactory();
 
+    /**
+     * \brief Obtain a new session instance for a given URL.
+     * 
+     * This call will block until a session is available. If maxSessions was not
+     * exceeded, a new session is created and its connection established. If no 
+     * session available and maxSession reached, the call blocks until one is avaialble.
+     * If there is a free session then it is returned immediately.
+     * 
+     * \param uri Full request URL.
+     * \return a speech session object.
+     */ 
     MSSpeechSession * getSession(const std::string &uri);
+    /**
+     * \brief Returns back a session after usage.
+     * 
+     * \param session session object
+     */
     void putSession(MSSpeechSession *session);
 
+    /**
+     * \brief Start object main run loop. Must be called before calling get().
+     */
     void start();
+    /**
+     * \brief Stop object main run loop.
+     */
     void stop();
 
 private:

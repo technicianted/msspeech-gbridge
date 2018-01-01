@@ -14,42 +14,25 @@ all copies or substantial portions of the Software.
 
 */
 
-#ifndef __STREAMINGRPCREQUESTHANDLER_H__
-#define __STREAMINGRPCREQUESTHANDLER_H__
-
-#include <grpc++/grpc++.h>
+#ifndef __SYNCRPCREQUESTHANDLER_H__
+#define __SYNCRPCREQUESTHANDLER_H__
 
 #include "msspeechsessionhandler.h"
 #include "msspeechrecoconfig.h"
-#include "google/cloud/speech/v1/cloud_speech.grpc.pb.h"
 
 class MSSpeechSession;
 
-/**
- * \brief Class handling the result side of the streaming call.
- * 
- * It handles the interaction with MSSpeechSession and mapping and sending
- * responses back to the client.
- */
-class StreamingRpcRequestHandler : public MSSpeechSessionHandler
+class SyncRpcRequestHandler : public MSSpeechSessionHandler
 {
 public:
-    /**
-     * \brief Construct a new handler. One is created per call.
-     * 
-     * \param session the MSSpeechSession object to use for this call.
-     * \param msspeechRecoConfig speech recognition configurations for this call.
-     * \param writer gRPC writer side of the streaming call.
-     */
-    StreamingRpcRequestHandler(
+    SyncRpcRequestHandler(
         MSSpeechSession *session, 
-        const MSSpeechRecoConfig &msspeechRecoConfig,
-        ::grpc::internal::WriterInterface<::google::cloud::speech::v1::StreamingRecognizeResponse> *writer);
+        const MSSpeechRecoConfig &msspeechRecoConfig);
+    ~SyncRpcRequestHandler();
 
-    /**
-     * \brief Block the caller until speech recognition has been completed.
-     */
-    void waitForCompletion();
+    ::grpc::Status recognize(
+        const std::string &audio,
+        ::google::cloud::speech::v1::RecognizeResponse* response);
 
     // MSSpeechSessinHandler callbacks
     void speechStartdetected(ms_speech_startdetected_message_t *message);
@@ -61,8 +44,8 @@ public:
 private:
     MSSpeechSession *session;
     MSSpeechRecoConfig msspeechRecoConfig;
-    ::grpc::internal::WriterInterface<::google::cloud::speech::v1::StreamingRecognizeResponse> *writer;
-    std::string currentDictationPhrase;
+    ::google::cloud::speech::v1::RecognizeResponse* response;
 };
 
 #endif
+

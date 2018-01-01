@@ -2,6 +2,7 @@
 #include "msspeechsessionfactory.h"
 #include "msspeechsession.h"
 #include "streamingrpcrequesthandler.h"
+#include "syncrpcrequesthandler.h"
 
 GoogleCloudSpeechServiceImpl::GoogleCloudSpeechServiceImpl(MSSpeechSessionFactory *sessionFactory)
 {
@@ -10,9 +11,25 @@ GoogleCloudSpeechServiceImpl::GoogleCloudSpeechServiceImpl(MSSpeechSessionFactor
 
 // Performs synchronous speech recognition: receive results after all audio
 // has been sent and processed.
-::grpc::Status GoogleCloudSpeechServiceImpl::Recognize(::grpc::ServerContext* context, const ::google::cloud::speech::v1::RecognizeRequest* request, ::google::cloud::speech::v1::RecognizeResponse* response)
+::grpc::Status GoogleCloudSpeechServiceImpl::Recognize(
+    ::grpc::ServerContext* context, 
+    const ::google::cloud::speech::v1::RecognizeRequest* request, 
+    ::google::cloud::speech::v1::RecognizeResponse* response)
 {
-    return ::grpc::Status(::grpc::UNIMPLEMENTED, "not implemented");
+    MSSpeechRecoConfig msspeechRecoConfig;
+    auto r = msspeechRecoConfig.load(request->config());
+    if (!r.ok())
+        return r;
+
+    if (request->audio().audio_source_case() != ::google::cloud::speech::v1::RecognitionAudio::kContent)
+       return ::grpc::Status(::grpc::INVALID_ARGUMENT, "audio.content not provided");
+    
+    auto session = this->sessionFactory->getSession(msspeechRecoConfig.getMSSpeechUrl());
+    SyncRpcRequestHandler requestHandler(session, msspeechRecoConfig);
+    auto recoResult = requestHandler.recognize(request->audio().content(), response);
+    sessionFactory->putSession(session);
+
+    return recoResult;
 }
 
 // Performs asynchronous speech recognition: receive results via the
@@ -38,17 +55,9 @@ GoogleCloudSpeechServiceImpl::GoogleCloudSpeechServiceImpl(MSSpeechSessionFactor
     if (!request.has_streaming_config()) {
         return ::grpc::Status(::grpc::FAILED_PRECONDITION, "streaming_config not provided");
     }
-    auto streamingConfig = request.streaming_config();
-    auto recoConfig = streamingConfig.config();
  
-    // TODO: Transcode?
-    auto encoding = recoConfig.encoding();
-    if (encoding != ::google::cloud::speech::v1::RecognitionConfig::LINEAR16) {
-        return ::grpc::Status(::grpc::INVALID_ARGUMENT, "only LEANEAR16 is supported");
-    }
-
     MSSpeechRecoConfig msspeechRecoConfig;
-    auto r = msspeechRecoConfig.load(streamingConfig);
+    auto r = msspeechRecoConfig.load(request.streaming_config());
     if (!r.ok())
         return r;
 
@@ -63,6 +72,7 @@ GoogleCloudSpeechServiceImpl::GoogleCloudSpeechServiceImpl(MSSpeechSessionFactor
         session->sendAudio(payload.data(), payloadSize);
     }
     session->endAudio();
+    // TODO: handle errors properly
     session->waitForCompletion();
 
     sessionFactory->putSession(session);

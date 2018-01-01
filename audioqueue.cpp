@@ -1,5 +1,5 @@
 #include <string.h>
-#include <assert>
+#include <assert.h>
 
 #include "audioqueue.h"
 

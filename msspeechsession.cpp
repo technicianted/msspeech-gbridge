@@ -27,9 +27,9 @@ void MSSpeechSession::recognizeStream(MSSpeechSessionHandler *sessionHandler)
 void MSSpeechSession::sendAudio(const char *buffer, int buffer_len)
 {
     if (!this->recognitionStarted)
-        return;
+        throw std::logic_error("Recognition hasn't started");
 
-    this->audioQueue.Put(buffer, buffer_len);
+    this->audioQueue.put(buffer, buffer_len);
     if (this->pendingAudio) {
         this->pendingAudio = false;
         ms_speech_resume_stream(this->connection);
@@ -39,9 +39,9 @@ void MSSpeechSession::sendAudio(const char *buffer, int buffer_len)
 void MSSpeechSession::endAudio()
 {
     if (!this->recognitionStarted)
-        return;
+        throw std::logic_error("Recognition hasn't started");
         
-    this->audioQueue.MarkEnd();
+    this->audioQueue.markEnd();
 }
 
 MSSpeechSession::CallStatus MSSpeechSession::waitForCompletion()
@@ -95,7 +95,7 @@ void MSSpeechSession::msspeechTurnEnd(ms_speech_turn_end_message_t *message)
 int MSSpeechSession::msspeech_audio_callback(ms_speech_connection_t connection, unsigned char *buffer, int buffer_len, void *user_data)
 {
     auto session = static_cast<MSSpeechSession *>(user_data);
-    auto size = session->audioQueue.Get((char *)buffer, buffer_len);
+    auto size = session->audioQueue.get((char *)buffer, buffer_len);
     if (size == -1) {
         return 0;
     }

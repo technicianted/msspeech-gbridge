@@ -4,15 +4,27 @@ Use unmodified Google Speech APIs to access Microsoft Cognitive Services Speech 
 
 ### Changes
 
-Change `speech.NewClient` invokation to pass `msspeech-gbridge` service endpoint and disable authentication:
+This example changes the sample [`livecaption.go`](https://github.com/GoogleCloudPlatform/golang-samples/blob/master/speech/livecaption/livecaption.go) to be able to connect to both Google APIs and `msspeech-gbridge`.
+
+Change `speech.NewClient` invokation to pass `msspeech-gbridge` a custom `grpc.ClientChann` to point to `msspeech-gbridge` endpoint:
 
 ```patch
-29a30,33
+10a11
+> 
+20a22
+> 	"google.golang.org/api/option"
+21a24
+> 	"google.golang.org/grpc"
+26a30,37
 > 	var options []option.ClientOption
 > 	if len(os.Args) > 1 {
-> 		options = append(options, option.WithEndpoint(os.Args[1]), option.WithoutAuthentication(), option.WithGRPCDialOption(grpc.WithInsecure()))
+> 		conn, err := grpc.Dial(os.Args[1], grpc.WithInsecure())
+> 		if err != nil {
+> 			log.Fatal(err)
+> 		}
+> 		options = append(options, option.WithGRPCConn(conn));
 > 	}
-31c35
+28c39
 < 	client, err := speech.NewClient(ctx)
 ---
 > 	client, err := speech.NewClient(ctx, options...)

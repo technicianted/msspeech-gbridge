@@ -12,9 +12,13 @@ On the other hande, Google provides an extensive set of client libraries for mul
 
 With `msspeech-gbridge` service, you can directly use unmodified Google client libraries to access Microsoft APIs.
 
+* Get union of features
+
+Use the APIs interchangeably to get the features you need. For example, language support, text normalization, etc.
+
 * Speech provider agnostic
 
-You can build your applications using Google client SDKs but still be able to choose between Google Speech APIs and Microsoft Cognitive Services Speech APIs depending on your scenario. For example if you want a feature or language that is supported in one API but not the other.
+You can build your applications using Google client SDKs but still be able to choose between Google Speech APIs and Microsoft Cognitive Services Speech APIs depending on your scenario without any code changes.
 
 ## Status
 
@@ -27,8 +31,10 @@ This is the very first version of the service. It only works.
 * Microsoft Speech APIs support `conversational` mode, which is not available in Google APIs.
 * Differences in underlying speech recognition parametesr should be evaluated. For example, timeouts and segmentation.
 * Support text to speech APIs.
-* Implement the two remaining Google Speech APIs: `Recognize` and `LongRunningRecognize`.
+* Implement the two remaining Google Speech APIs: `LongRunningRecognize`.
+* Support Google speech audio codecs that are not supported by Microsoft Speech APIs: `FLAC`, `MULAW`, `AMR_WB`, `OGG_OPUS`, `SPEEX_WITH_HEADER_BYTE`.
 * Package in a Docker container.
+* Support TLS.
 * Lots of documentation!
 
 ## Building from source
@@ -37,8 +43,9 @@ Currently you have to build from source.
 
 ### Dependencies
 
-* [`libmsspeech`](https://github.com/technicianted/libmsspeech).
-* [`gRPC`](https://grpc.io).
+* [`libmsspeech`](https://github.com/technicianted/libmsspeech)
+* [`gRPC`](https://grpc.io)
+* [`fmtlib`](https://github.com/fmtlib/fmt)
 
 ### Building
 
@@ -64,7 +71,9 @@ make
 
 ## Using
 
-Example usage using varios Google SDKs can be found [here](https://github.com/technicianted/msspeech-gbridge/tree/master/examples/). 
+Example usage using varios Google SDKs can be found [here](https://github.com/technicianted/msspeech-gbridge/tree/master/examples/):
+* [Go](https://github.com/technicianted/msspeech-gbridge/tree/master/examples/go)
+* [Python](https://github.com/technicianted/msspeech-gbridge/tree/master/examples/python) 
 
 ### As a standalone service
 

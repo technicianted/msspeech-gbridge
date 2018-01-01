@@ -39,6 +39,7 @@ class MSSpeechRecoConfig
 public:
     MSSpeechRecoConfig();
 
+    ::grpc::Status load(const ::google::cloud::speech::v1::RecognitionConfig &googleRecoConfig);
     ::grpc::Status load(const ::google::cloud::speech::v1::StreamingRecognitionConfig &googleSpeechConfig);
     std::string getMSSpeechUrl() const;
 

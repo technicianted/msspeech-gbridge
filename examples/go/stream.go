@@ -29,7 +29,11 @@ func main() {
 
 	var options []option.ClientOption
 	if len(os.Args) > 1 {
-		options = append(options, option.WithEndpoint(os.Args[1]), option.WithoutAuthentication(), option.WithGRPCDialOption(grpc.WithInsecure()))
+		conn, err := grpc.Dial(os.Args[1], grpc.WithInsecure())
+		if err != nil {
+			log.Fatal(err)
+		}
+		options = append(options, option.WithGRPCConn(conn));
 	}
 	// [START speech_streaming_mic_recognize]
 	client, err := speech.NewClient(ctx, options...)

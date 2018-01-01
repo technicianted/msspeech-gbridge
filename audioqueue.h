@@ -24,16 +24,64 @@ all copies or substantial portions of the Software.
 
 class AudioQueueEntry;
 
+/**
+ * \brief Implementation of produce-consumer thraded blocking audio queue.
+ * 
+ * Impelementation of audio queue capable of blocking get operations
+ * until requrested size becomes available. It also supports produces
+ * and consumers calling from different threads.
+ * It also supports marking the queue as completed and notifying consumers.
+ */
 class AudioQueue
 {
 public:
+    /**
+     * \brief Construct a new instance of AudioQueue.
+     */
     AudioQueue();
     ~AudioQueue();
 
+    /**
+     *  \brief Non-blocking queue the given bytes.
+     * 
+     * \param buffer Byte input to queue.
+     * \param length Byte input size.
+     */
     int put(const char *buffer, int length);
+    /**
+     * \brief Non-blocking dequeue.
+     * 
+     * This method attempts to deuque a maximum of given byte size 
+     * without blocking.
+     * 
+     * \param buffer pointer to buffer to be filled.
+     * \param requestedLength maximum bytes to dequeue.
+     * \return Dequeued size, 0 if no bytes available, -1 if queue ended
+     * and drained, or terminated.
+     */
     int get(char *buffer, int requestedLength);
+    /**
+     * \brief Blocking dequeue.
+     * 
+     * This method blocks until requestedLength is available
+     * or queue has ended.
+     * 
+     * \param buffer pointer to buffer to be filled.
+     * \param requestedLength byte size to provide.
+     * \return requestedLength if available, or less if queue has ended
+     * and drained, or terminated.
+     */
     int blockingGet(char *buffer, int requestedLength);
+    /**
+     * \brief Mark queue as ended and notify consumers.
+     */
     void markEnd();
+    /**
+     * \brief Set queue as terminated notifying consumers.
+     * 
+     * Terminating a queue informs consumers immediately even 
+     * if queue was not drawined.
+     */
     void terminate();
 
 private:
