@@ -33,9 +33,54 @@ This is the very first version of the service. It only works.
 * Support text to speech APIs.
 * Implement the two remaining Google Speech APIs: `LongRunningRecognize`.
 * Support Google speech audio codecs that are not supported by Microsoft Speech APIs: `FLAC`, `MULAW`, `AMR_WB`, `OGG_OPUS`, `SPEEX_WITH_HEADER_BYTE`.
-* Package in a Docker container.
+* Better command line arguments.
 * Support TLS.
 * Lots of documentation!
+
+## Using
+
+Example usage using various Google SDKs can be found [here](https://github.com/technicianted/msspeech-gbridge/tree/master/examples/):
+* [C#](https://github.com/technicianted/msspeech-gbridge/tree/master/examples/csharp)
+* [Go](https://github.com/technicianted/msspeech-gbridge/tree/master/examples/go)
+* [Python](https://github.com/technicianted/msspeech-gbridge/tree/master/examples/python) 
+
+Rest of platform SDKs should work but have not been tested.
+
+### As a container
+
+```
+docker run --rm -t -p 8080:8080 technicianted/msspeech-gbridge /run.sh <your microsoft speech subscription key>
+```
+
+### As a standalone service
+
+To use, you will need to build from source and run:
+
+```
+./msspeech-gbridge <your microsoft speech API subscription key>
+```
+
+## Implications
+
+There are some implications when using `msspeech-gbridge` for your speech applications.
+
+### Latency
+
+Depending on where/how you run `msspeech-gbridge`, some latency might be incurred espcially for shorter audio. With each request, `msspeech-gbridge` attempts to reuse existing connection. If there isn't any, it connects to Microsoft Speech Service and caches the new connection. In the latter case, the time it takes to establish the connection is added to the leading latency.
+
+However, in most cases, Microsoft Speech Service would catch up and make up for the leading latency. In such cases, no trailing latency is added.
+
+1. Running locally with client (same local network or same box):
+
+No latency as client to `msspeech-gbridge` connection establishment is very fast.
+
+1. Running in same region as Microsoft Speech Service:
+
+When running in Azure as a container, in most cases `msspeech-gbridge` would hit a Microsoft Speech Service instanced that is located within the same datacenter. In which case, minimal or no latency is added.
+
+1. Running remotely:
+
+Latency might be incurred due to connection establishment time if audio is very short. Otherwise, Microsoft Speech Service would catch up.
 
 ## Building from source
 
@@ -68,22 +113,3 @@ cd build
 cmake ../
 make
 ```
-
-## Using
-
-Example usage using various Google SDKs can be found [here](https://github.com/technicianted/msspeech-gbridge/tree/master/examples/):
-* [C#](https://github.com/technicianted/msspeech-gbridge/tree/master/examples/csharp)
-* [Go](https://github.com/technicianted/msspeech-gbridge/tree/master/examples/go)
-* [Python](https://github.com/technicianted/msspeech-gbridge/tree/master/examples/python) 
-
-### As a standalone service
-
-To use, you will need to build from source and run:
-
-```
-./msspeech-gbridge <your microsoft speech API subscription key>
-```
-
-### As a container
-
-Coming soon.
