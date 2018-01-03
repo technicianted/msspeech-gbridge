@@ -48,9 +48,22 @@ Rest of platform SDKs should work but have not been tested.
 
 ### As a container
 
+#### Using docker locally
+
 ```
-docker run --rm -t -p 8080:8080 technicianted/msspeech-gbridge /run.sh <your microsoft speech subscription key>
+docker run --rm -t -p 8080:8080 technicianted/msspeech-gbridge:experimental /run.sh <your microsoft speech subscription key>
 ```
+
+#### Using Azure Container Instance
+
+If you have an Azure subscription, you can quickly bring up a container running `msspeech-gbridge` as a service:
+
+```
+az group create --name gbridge --location eastus
+az container create --resource-group gbridge --name msspeech-gbridge --image technicianted/msspeech-gbridge --ip-address public --ports 8080
+```
+
+Then you can use the assigned public IP address as an endpoint when using the clients.
 
 ### As a standalone service
 
