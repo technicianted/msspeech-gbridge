@@ -60,7 +60,7 @@ If you have an Azure subscription, you can quickly bring up a container running 
 
 ```
 az group create --name gbridge --location eastus
-az container create --resource-group gbridge --name msspeech-gbridge --image technicianted/msspeech-gbridge --ip-address public --ports 8080
+az container create --resource-group gbridge --name msspeech-gbridge --image technicianted/msspeech-gbridge --ip-address public --ports 8080  --command-line '/run.sh <your subscription key>'
 ```
 
 Then you can use the assigned public IP address as an endpoint when using the clients.
@@ -119,7 +119,7 @@ cd googleapis
 make LANGUAGE=c++ OUTPUT=output/
 ```
 
-* Build `msspeech-bridge`:
+* Build `msspeech-gbridge`:
 ```
 mkdir build
 cd build
