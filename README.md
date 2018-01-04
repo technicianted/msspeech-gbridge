@@ -6,7 +6,7 @@ Service to allow using of unmodified [Google Speech](https://cloud.google.com/sp
 
 * Richer client support
 
-Microsoft [Cognitive Services speech APIs](https://azure.microsoft.com/en-us/services/cognitive-services/speech/) do not provide any client SDKs. Instead, you must rely on community built or build your own. For example, if you are building a C/C++ based application, you can use [libmsspeech](https://github.com/technicianted/libmsspeech) open source client library.
+Microsoft [Cognitive Services speech APIs](https://azure.microsoft.com/en-us/services/cognitive-services/speech/) only provide [JavaScript](https://docs.microsoft.com/en-us/azure/cognitive-services/speech/getstarted/getstartedjswebsockets) SDK for their latest open [API](https://docs.microsoft.com/en-us/azure/cognitive-services/speech/api-reference-rest/websocketprotocol) and C#/iOS/Android for the legacy, closed API. Otherwise, you must rely on community built or build your own. For example, if you are building a C/C++ based application, you can use [libmsspeech](https://github.com/technicianted/libmsspeech) open source client library.
 
 On the other hande, Google provides an extensive set of client libraries for multiple platform. At the time of this writing, they support C#, Go, Java, Node.js, PHP, Python and Ruby.
 
@@ -60,7 +60,7 @@ If you have an Azure subscription, you can quickly bring up a container running 
 
 ```
 az group create --name gbridge --location eastus
-az container create --resource-group gbridge --name msspeech-gbridge --image technicianted/msspeech-gbridge --ip-address public --ports 8080  --command-line '/run.sh <your subscription key>'
+az container create --resource-group gbridge --name msspeech-gbridge --image technicianted/msspeech-gbridge:experimental --ip-address public --ports 8080  --command-line '/run.sh <your subscription key>'
 ```
 
 Then you can use the assigned public IP address as an endpoint when using the clients.
