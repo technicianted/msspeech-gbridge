@@ -43,6 +43,9 @@ MSSpeechSession * MSSpeechSessionFactory::getSession(const std::string &uri)
     auto session = *(this->availableSessionsByUri[uri].begin());
 
     session->session = new MSSpeechSession(session->connection);
+    session->checkedOut = true;
+    session->checkoutTime = std::time(NULL);
+
     this->sessionsBySession[session->session] = session;
     this->availableSessionsByUri[uri].erase(session);
     this->busySesssions.insert(session);
@@ -57,6 +60,12 @@ void MSSpeechSessionFactory::putSession(MSSpeechSession *session)
     assert(this->sessionsBySession.find(session) != this->sessionsBySession.end());
     auto recoSession = this->sessionsBySession[session];
     assert(this->busySesssions.find(recoSession) != this->busySesssions.end());
+    
+    this->sessionsBySession.erase(recoSession->session);
+    delete recoSession->session;
+    recoSession->session = NULL;
+    recoSession->checkedOut = false;
+
     this->availableSessionsByUri[recoSession->uri].insert(recoSession);
     this->sessionCondition.notify_all();
 }
@@ -111,6 +120,7 @@ void MSSpeechSessionFactory::processPendingSessions()
         memset(&callbacks, 0, sizeof(callbacks));
         callbacks.log = &msspeech_log;
         callbacks.provide_authentication_header = &msspeech_provide_authentication_header;
+        callbacks.connection_closed = &msspeech_connection_closed;
         callbacks.connection_error = &msspeech_connection_error;
         callbacks.client_ready = &msspeech_client_ready;
         callbacks.speech_startdetected = &msspeech_speech_startdetected;
@@ -189,6 +199,14 @@ void MSSpeechSessionFactory::msspeech_connection_closed(ms_speech_connection_t c
     }
 
     factory->log(MS_SPEECH_LOG_DEBUG, fmt::sprintf("msspeech_connection_closed: %s", session->uri));
+    if (session->checkedOut) {
+        // TODO: need to tell handlers about this.
+    }
+
+    factory->availableSessionsByUri[session->uri].erase(session);
+    factory->sessionsBySession.erase(session->session);
+    factory->sessions.erase(session);
+    delete session;
 }
 
 void MSSpeechSessionFactory::msspeech_client_ready(ms_speech_connection_t connection, void *user_data)
@@ -322,4 +340,13 @@ void MSSpeechSessionFactory::msspeech_log(ms_speech_connection_t connection, voi
 void MSSpeechSessionFactory::msspeech_global_log(ms_speech_log_level_t level, const char *message)
 {
     log(level, message);
+}
+
+RecognitionSession::RecognitionSession()
+{
+    this->factory = NULL;
+    this->connection = NULL;
+    this->session = NULL;
+    this->checkedOut = false;
+    this->checkoutTime = std::time(NULL);
 }

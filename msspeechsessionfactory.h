@@ -24,6 +24,7 @@ all copies or substantial portions of the Software.
 #include <thread>
 #include <string>
 #include <ms_speech/ms_speech.h>
+#include <ctime>
 
 class MSSpeechSession;
 class RecognitionSession;
@@ -119,11 +120,16 @@ private:
 class RecognitionSession
 {
 public:
+RecognitionSession();
+
     MSSpeechSessionFactory *factory;
 
     std::string uri;
     ms_speech_connection_t connection;
     MSSpeechSession *session;
+
+    bool checkedOut;
+    std::time_t checkoutTime;
 };
 
 #endif

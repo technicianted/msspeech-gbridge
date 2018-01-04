@@ -87,13 +87,17 @@ However, in most cases, Microsoft Speech Service would catch up and make up for 
 
 No latency as client to `msspeech-gbridge` connection establishment is very fast.
 
-1. Running in same region as Microsoft Speech Service:
+2. Running in same region as Microsoft Speech Service:
 
 When running in Azure as a container, in most cases `msspeech-gbridge` would hit a Microsoft Speech Service instanced that is located within the same datacenter. In which case, minimal or no latency is added.
 
-1. Running remotely:
+3. Running remotely:
 
 Latency might be incurred due to connection establishment time if audio is very short. Otherwise, Microsoft Speech Service would catch up.
+
+### Cost
+
+The application runs as a service. Which means you can either run it as a container or on a dedicated VM, both requiring continuous cost per seconds.
 
 ## Building from source
 
