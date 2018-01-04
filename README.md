@@ -109,7 +109,7 @@ Currently you have to build from source.
 * [`gRPC`](https://grpc.io)
 * [`fmtlib`](https://github.com/fmtlib/fmt)
 
-### Building
+### Building from source
 
 * Update Google Cloud APIs:
 
