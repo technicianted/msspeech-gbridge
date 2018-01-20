@@ -25,6 +25,7 @@ all copies or substantial portions of the Software.
 #include <string>
 #include <ms_speech/ms_speech.h>
 #include <ctime>
+#include <spdlog/spdlog.h>
 
 class MSSpeechSession;
 class RecognitionSession;
@@ -58,9 +59,10 @@ public:
      * If there is a free session then it is returned immediately.
      * 
      * \param uri Full request URL.
+     * \param requestId request identification.
      * \return a speech session object.
      */ 
-    MSSpeechSession * getSession(const std::string &uri);
+    MSSpeechSession * getSession(const std::string &uri, const std::string &requestId);
     /**
      * \brief Returns back a session after usage.
      * 
@@ -98,7 +100,7 @@ private:
     void processPendingSessions();
 
     static void log(ms_speech_log_level_t level, const std::string &message);
-
+    static std::shared_ptr<spdlog::logger> Logger;
  	static void msspeech_connection_established(ms_speech_connection_t connection, void *user_data);
 	static void msspeech_connection_error(ms_speech_connection_t connection, unsigned int http_status, const char *error_message, void *user_data);
 	static void msspeech_connection_closed(ms_speech_connection_t connection, void *user_data);
@@ -125,6 +127,7 @@ RecognitionSession();
     MSSpeechSessionFactory *factory;
 
     std::string uri;
+    std::string requestId;
     ms_speech_connection_t connection;
     MSSpeechSession *session;
 

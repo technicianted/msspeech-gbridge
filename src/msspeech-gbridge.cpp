@@ -1,44 +1,52 @@
 #include <iostream>
 #include <fstream>
 #include <unistd.h>
-#include <sstream>
 #include <grpc++/server_builder.h>
 #include <grpc++/server.h>
+#include <spdlog/spdlog.h>
 
 #include "googlecloudspeechserviceimpl.h"
 #include "msspeechsessionfactory.h"
 #include "msspeechsession.h"
+#include "msspeech-gbridge-cli.h"
 
-class MSSpeechGBridge
+int start(int argc, char **argv)
 {
-public:
-    int Start(int argc, char **argv)
-    {
-        std::string listen_address = "0.0.0.0";
-        int listen_port = 8080;
-        std::ostringstream stringStream;
-        stringStream << listen_address << ":" << listen_port;
-        std::string server_address = stringStream.str();
-        
-        MSSpeechSessionFactory factory(argv[1], 2);
-        factory.start();
+    MSSpeechSessionFactory factory(subscriptionKey, maxSessions);
+    factory.start();
 
-        GoogleCloudSpeechServiceImpl serviceImpl(&factory);
-        ::grpc::ServerBuilder builder;
-        builder.AddListeningPort(server_address, ::grpc::InsecureServerCredentials());
-        builder.RegisterService(&serviceImpl);
-        std::unique_ptr<grpc::Server> server(builder.BuildAndStart());
-        std::cout << "Server listening on " << server_address << std::endl;
+    GoogleCloudSpeechServiceImpl serviceImpl(&factory);
+    ::grpc::ServerBuilder builder;
+    builder.AddListeningPort(listenEndpoint, ::grpc::InsecureServerCredentials());
+    builder.RegisterService(&serviceImpl);
+    std::unique_ptr<grpc::Server> server(builder.BuildAndStart());
+    std::cout << "Server listening on " << listenEndpoint << std::endl;
 
-        server->Wait();
-        return 0;
-    }
-};
+    server->Wait();
+    return 0;
+}
 
 int main(int argc, char **argv)
 {
-    MSSpeechGBridge bridge;
-    bridge.Start(argc, argv);
+    if (parse_opt(argc, argv) == -1) {
+        usage();
+    }
 
-    return 0;
+    if (listenEndpoint.empty()) {
+        std::cerr << "listen endpoint not specified" << std::endl;
+        usage();
+    }
+    if (subscriptionKey.empty()) {
+        std::cerr << "subscription key not specified" << std::endl;
+        usage();
+    }
+
+    for(unsigned int i=0; i<sizeof(spdlog::level::level_names); i++) {
+        if (logLevel == spdlog::level::level_names[i]) {
+            spdlog::set_level((spdlog::level::level_enum)i);
+            break;
+        }
+    }
+
+    return start(argc, argv);
 }

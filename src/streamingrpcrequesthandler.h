@@ -18,6 +18,7 @@ all copies or substantial portions of the Software.
 #define __STREAMINGRPCREQUESTHANDLER_H__
 
 #include <grpc++/grpc++.h>
+#include <spdlog/spdlog.h>
 
 #include "msspeechsessionhandler.h"
 #include "msspeechrecoconfig.h"
@@ -42,6 +43,7 @@ public:
      * \param writer gRPC writer side of the streaming call.
      */
     StreamingRpcRequestHandler(
+        std::shared_ptr<spdlog::logger> &logger,
         MSSpeechSession *session, 
         const MSSpeechRecoConfig &msspeechRecoConfig,
         ::grpc::internal::WriterInterface<::google::cloud::speech::v1::StreamingRecognizeResponse> *writer);
@@ -59,6 +61,7 @@ public:
     void speechResult(ms_speech_result_message_t *message);
 
 private:
+    std::shared_ptr<spdlog::logger> &logger;
     MSSpeechSession *session;
     MSSpeechRecoConfig msspeechRecoConfig;
     ::grpc::internal::WriterInterface<::google::cloud::speech::v1::StreamingRecognizeResponse> *writer;

@@ -43,6 +43,9 @@ public:
 
     CallStatus waitForCompletion();
 
+    void setRequestId(const std::string &requestId);
+    const std::string & getRequestId() const;
+
     void msspeechConnectionClosed(unsigned int httpStatus, const std::string &message);
     void msspeechStartDetected(ms_speech_startdetected_message_t *message);
     void msspeechEndDetected(ms_speech_enddetected_message_t *message);
@@ -54,6 +57,7 @@ public:
 
 private:
     ms_speech_connection_t connection;
+    std::string requestId;
     AudioQueue audioQueue;
     MSSpeechSessionHandler *sessionHandler;
     bool recognitionStarted;

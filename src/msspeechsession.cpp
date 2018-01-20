@@ -19,7 +19,7 @@ void MSSpeechSession::recognizeStream(MSSpeechSessionHandler *sessionHandler)
 
     this->sessionHandler = sessionHandler;
     this->pendingAudio = false;
-    ms_speech_start_stream(this->connection, &msspeech_audio_callback, this);
+    ms_speech_start_stream(this->connection, &msspeech_audio_callback, this->requestId.c_str(), this);
     this->recognitionStarted = true;
     this->completionLock.lock();
 }
@@ -42,6 +42,16 @@ void MSSpeechSession::endAudio()
         throw std::logic_error("Recognition hasn't started");
         
     this->audioQueue.markEnd();
+}
+
+void MSSpeechSession::setRequestId(const std::string &requestId)
+{
+    this->requestId = requestId;
+}
+
+const std::string & MSSpeechSession::getRequestId() const
+{
+    return requestId;
 }
 
 MSSpeechSession::CallStatus MSSpeechSession::waitForCompletion()

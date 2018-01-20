@@ -1,4 +1,7 @@
 #include "googlecloudspeechserviceimpl.h"
+
+#include <uuid/uuid.h>
+
 #include "msspeechsessionfactory.h"
 #include "msspeechsession.h"
 #include "streamingrpcrequesthandler.h"
@@ -16,6 +19,11 @@ GoogleCloudSpeechServiceImpl::GoogleCloudSpeechServiceImpl(MSSpeechSessionFactor
     const ::google::cloud::speech::v1::RecognizeRequest* request, 
     ::google::cloud::speech::v1::RecognizeResponse* response)
 {
+   auto requestId = this->getRequestId(context);
+    auto logger = spdlog::stderr_logger_mt(requestId);
+    logger->trace("request metadata: {0}", this->dumpMetadata(context));
+    logger->debug("Recognize request start");
+
     MSSpeechRecoConfig msspeechRecoConfig;
     auto r = msspeechRecoConfig.load(request->config());
     if (!r.ok())
@@ -24,7 +32,7 @@ GoogleCloudSpeechServiceImpl::GoogleCloudSpeechServiceImpl(MSSpeechSessionFactor
     if (request->audio().audio_source_case() != ::google::cloud::speech::v1::RecognitionAudio::kContent)
        return ::grpc::Status(::grpc::INVALID_ARGUMENT, "audio.content not provided");
     
-    auto session = this->sessionFactory->getSession(msspeechRecoConfig.getMSSpeechUrl());
+    auto session = this->sessionFactory->getSession(msspeechRecoConfig.getMSSpeechUrl(), requestId);
     SyncRpcRequestHandler requestHandler(session, msspeechRecoConfig);
     auto recoResult = requestHandler.recognize(request->audio().content(), response);
     sessionFactory->putSession(session);
@@ -49,20 +57,30 @@ GoogleCloudSpeechServiceImpl::GoogleCloudSpeechServiceImpl(MSSpeechSessionFactor
         ::google::cloud::speech::v1::StreamingRecognizeResponse, 
         ::google::cloud::speech::v1::StreamingRecognizeRequest>* stream)
 {
+    auto requestId = this->getRequestId(context);
+    auto logger = spdlog::stderr_logger_mt(requestId);
+    logger->trace("request metadata: {0}", this->dumpMetadata(context));
+    logger->debug("StreamingRecognize request start");
+
     ::google::cloud::speech::v1::StreamingRecognizeRequest request; 
     stream->Read(&request);
 
     if (!request.has_streaming_config()) {
+        logger->notice("streaming_config not provided");
         return ::grpc::Status(::grpc::FAILED_PRECONDITION, "streaming_config not provided");
     }
  
+    logger->debug("streaming_config: {0}", request.streaming_config().ShortDebugString());
     MSSpeechRecoConfig msspeechRecoConfig;
     auto r = msspeechRecoConfig.load(request.streaming_config());
-    if (!r.ok())
+    if (!r.ok()) {
+        logger->notice("config mapping failed: {0}: {1}", r.error_code(), r.error_message());
         return r;
+    }
+    logger->debug("reco_config: {0}", msspeechRecoConfig.str());
 
-    auto session = this->sessionFactory->getSession(msspeechRecoConfig.getMSSpeechUrl());
-    StreamingRpcRequestHandler requestHandler(session, msspeechRecoConfig, stream);
+    auto session = this->sessionFactory->getSession(msspeechRecoConfig.getMSSpeechUrl(), requestId);
+    StreamingRpcRequestHandler requestHandler(logger, session, msspeechRecoConfig, stream);
     session->recognizeStream(&requestHandler);
 
     while (stream->Read(&request)) {
@@ -77,5 +95,27 @@ GoogleCloudSpeechServiceImpl::GoogleCloudSpeechServiceImpl(MSSpeechSessionFactor
 
     sessionFactory->putSession(session);
 
+    logger->debug("request end");
+
     return ::grpc::Status::OK;
+}
+
+std::string GoogleCloudSpeechServiceImpl::getRequestId(::grpc::ServerContext *context)
+{
+    uuid_t requestIdUuid;
+    uuid_generate(requestIdUuid);
+    char buffer[64];
+    uuid_unparse(requestIdUuid, buffer);
+    return std::string(buffer);
+}
+
+std::string GoogleCloudSpeechServiceImpl::dumpMetadata(::grpc::ServerContext *context)
+{
+    auto metadata = context->client_metadata();
+    fmt::MemoryWriter writer;
+    for(auto md : metadata) {
+        writer.write("({0}: {1}) ", md.first, md.second);
+    }
+
+    return writer.c_str();
 }

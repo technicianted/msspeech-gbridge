@@ -47,6 +47,8 @@ public:
     MSSpeechProfanityFilterMode profanityFilterMode() const { return _profanityFilterMode; }
     std::string language() const { return _language; }
     bool enableIntermediateResults() const { return _enableIntermediateResults; }
+
+    std::string str() const;
  
 private:
     MSSpeechRecognitionMode _recognitionMode;

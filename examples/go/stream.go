@@ -29,16 +29,16 @@ func main() {
 
 	var options []option.ClientOption
 	if len(os.Args) > 1 {
-		fmt.Printf("Using msspeech-bridge at %s", os.Args[1]);
+		fmt.Printf("Using msspeech-bridge at %s\n", os.Args[1])
 		conn, err := grpc.Dial(os.Args[1], grpc.WithInsecure())
 		if err != nil {
 			log.Fatal(err)
 		}
-		options = append(options, option.WithGRPCConn(conn));
+		options = append(options, option.WithGRPCConn(conn))
 	} else {
-		fmt.Printf("Using default Google APIs");
+		fmt.Printf("Using default Google APIs\n")
 	}
-	
+
 	// [START speech_streaming_mic_recognize]
 	client, err := speech.NewClient(ctx, options...)
 	if err != nil {

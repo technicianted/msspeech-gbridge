@@ -60,3 +60,13 @@ std::string MSSpeechRecoConfig::getMSSpeechUrl() const
         this->_profanityFilterMode == MSSpeechProfanityFilterMode::MASK ? "mask" : "raw");
     return url;
 }
+
+std::string MSSpeechRecoConfig::str() const
+{
+    return fmt::format(
+        "recognitionMode: {0}, profanityFilterMode: {1}, enableIntermediateResults: {2}, language: {3}",
+        (int)_recognitionMode,
+        (int)_profanityFilterMode,
+        _enableIntermediateResults,
+        _language);
+}

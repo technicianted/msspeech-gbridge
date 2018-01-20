@@ -40,6 +40,9 @@ public:
 
 private:
     MSSpeechSessionFactory *sessionFactory;
+
+    std::string getRequestId(::grpc::ServerContext *context);
+    std::string dumpMetadata(::grpc::ServerContext *context);
 };
 
 #endif

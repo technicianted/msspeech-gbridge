@@ -4,9 +4,11 @@
 #include <fmt/format.h>
 
 StreamingRpcRequestHandler::StreamingRpcRequestHandler(
+    std::shared_ptr<spdlog::logger> &logger,
     MSSpeechSession *session, 
     const MSSpeechRecoConfig &msspeechRecoConfig,
     ::grpc::internal::WriterInterface<::google::cloud::speech::v1::StreamingRecognizeResponse> *writer)
+    : logger(logger)
 {
     this->session = session;
     this->msspeechRecoConfig = msspeechRecoConfig;

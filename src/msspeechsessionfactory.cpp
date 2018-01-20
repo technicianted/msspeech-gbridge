@@ -6,6 +6,8 @@
 #include "msspeechsessionfactory.h"
 #include "msspeechsession.h"
 
+std::shared_ptr<spdlog::logger> MSSpeechSessionFactory::Logger = spdlog::stderr_logger_mt("factory");
+
 MSSpeechSessionFactory::MSSpeechSessionFactory(const std::string &msspeechSubscriptionKey, int maxSessions)
 {
     this->msspeechSubscriptionKey = msspeechSubscriptionKey;
@@ -22,16 +24,16 @@ MSSpeechSessionFactory::~MSSpeechSessionFactory()
         this->stop();
 }
 
-MSSpeechSession * MSSpeechSessionFactory::getSession(const std::string &uri)
+MSSpeechSession * MSSpeechSessionFactory::getSession(const std::string &uri, const std::string &requestId)
 {
-    this->log(MS_SPEECH_LOG_DEBUG, fmt::sprintf("Session requested for %s", uri));
+    Logger->info("{0}: session requested for {1}", requestId, uri);
 
     std::unique_lock<std::mutex> lock(this->lock);
     if (this->availableSessionsByUri.find(uri) == this->availableSessionsByUri.end() ||
         this->availableSessionsByUri[uri].size() == 0) {
-        this->log(MS_SPEECH_LOG_DEBUG, fmt::sprintf("No sessions found for %s, creating new one", uri));
+        Logger->debug("{0}: no sessions found for {1}, creating new one", requestId, uri);
         this->createNewSession(uri);
-        this->log(MS_SPEECH_LOG_DEBUG, fmt::sprintf("Waiting for session for %s", uri));
+        Logger->debug("{0}: waiting for session for {1}", requestId, uri);
 
         // TODO: can't wait forever if connection failed
         while(this->availableSessionsByUri[uri].size() == 0) {
@@ -39,12 +41,14 @@ MSSpeechSession * MSSpeechSessionFactory::getSession(const std::string &uri)
         }
         // TODO: Verify session is still good due to race conditions
     }
-    this->log(MS_SPEECH_LOG_DEBUG, fmt::sprintf("Got session for %s", uri));
+    Logger->debug("{0}: got session for {1}", requestId, uri);
     auto session = *(this->availableSessionsByUri[uri].begin());
 
     session->session = new MSSpeechSession(session->connection);
+    session->requestId = requestId;
     session->checkedOut = true;
     session->checkoutTime = std::time(NULL);
+    session->session->setRequestId(requestId);
 
     this->sessionsBySession[session->session] = session;
     this->availableSessionsByUri[uri].erase(session);
@@ -60,9 +64,12 @@ void MSSpeechSessionFactory::putSession(MSSpeechSession *session)
     assert(this->sessionsBySession.find(session) != this->sessionsBySession.end());
     auto recoSession = this->sessionsBySession[session];
     assert(this->busySesssions.find(recoSession) != this->busySesssions.end());
-    
+
+    Logger->debug("{0}: returning session for {1}", recoSession->requestId, recoSession->uri);
+   
     this->sessionsBySession.erase(recoSession->session);
     delete recoSession->session;
+    recoSession->requestId.clear();
     recoSession->session = NULL;
     recoSession->checkedOut = false;
 
@@ -88,7 +95,7 @@ void MSSpeechSessionFactory::start()
     this->terminateRunloop = false;
     this->runloopThread = std::thread([this]{
         this->runloopStarted = true;
-        this->log(MS_SPEECH_LOG_INFO, "Starting session factory run loop");
+        Logger->info("starting session factory run loop");
     
         while(!this->terminateRunloop) {
             ms_speech_service_step(this->msspeechContext, 50000);
@@ -97,15 +104,13 @@ void MSSpeechSessionFactory::start()
         }
 
         this->runloopStarted = false;
-        this->log(MS_SPEECH_LOG_INFO, "Session factory run loop terminated");
+        Logger->info("session factory run loop terminated");
     });
-
-    sleep(1);
 }
 
 void MSSpeechSessionFactory::stop()
 {
-    this->log(MS_SPEECH_LOG_INFO, "Signalling run loop to terminate");
+    Logger->info("signalling run loop to terminate");
 
     this->terminateRunloop = true;
     ms_speech_service_cancel_step(this->msspeechContext);
@@ -114,8 +119,11 @@ void MSSpeechSessionFactory::stop()
 
 void MSSpeechSessionFactory::processPendingSessions()
 {
-    std::lock_guard<std::mutex> lock(this->lock);
+    std::unique_lock<std::mutex> lock(this->lock);
     if (this->pendingSessions.size() > 0) {
+        auto pendingSession = this->pendingSessions;
+        lock.unlock();
+
         ms_speech_client_callbacks_t callbacks;
         memset(&callbacks, 0, sizeof(callbacks));
         callbacks.log = &msspeech_log;
@@ -131,21 +139,20 @@ void MSSpeechSessionFactory::processPendingSessions()
         callbacks.turn_start = &msspeech_turn_start;
         callbacks.turn_end = &msspeech_turn_end;
 
-        auto iter = this->pendingSessions.begin();
-        while(iter != this->pendingSessions.end()) {
-            auto session = *iter;
+        for(auto pendingSession : pendingSessions) {
             ms_speech_connection_t connection;
-            this->log(MS_SPEECH_LOG_DEBUG, fmt::sprintf("Starting connection to %s", session->uri));
-            callbacks.user_data = session;
-            int r = ms_speech_connect(this->msspeechContext, session->uri.c_str(), &callbacks, &connection);
+            Logger->debug("starting connection to {0}", pendingSession->uri);
+            callbacks.user_data = pendingSession;
+            int r = ms_speech_connect(this->msspeechContext, pendingSession->uri.c_str(), &callbacks, &connection);
             if (r) {
-                this->log(MS_SPEECH_LOG_ERR, fmt::sprintf("Failed to create connection to %s: %s", session->uri, strerror(r)));
-                iter++;
+                Logger->error("failed to create connection to {0}: {1}", pendingSession->uri, strerror(r));
             }
             else {
-                session->connection = connection;
-                this->sessions.insert(session);
-                this->pendingSessions.erase(iter++);
+                pendingSession->connection = connection;
+                lock.lock();
+                if (this->pendingSessions.erase(pendingSession)) {
+                    this->sessions.insert(pendingSession);
+                }
             }
         }
     }
@@ -153,16 +160,41 @@ void MSSpeechSessionFactory::processPendingSessions()
 
 void MSSpeechSessionFactory::log(ms_speech_log_level_t level, const std::string &message)
 {
-    time_t current_time;
-    struct tm * time_info;
-    char timeString[10];
-
-    time(&current_time);
-    time_info = localtime(&current_time);
-
-    strftime(timeString, sizeof(timeString), "%H:%M:%S", time_info);
-
-    std::cout << timeString << ": " << message << std::endl;
+    switch(level) {
+        case MS_SPEECH_LOG_ERR:
+            Logger->error(message);
+            break;
+	    case MS_SPEECH_LOG_WARN:
+            Logger->warn(message);
+            break;
+	    case MS_SPEECH_LOG_NOTICE:
+            Logger->notice(message);
+            break;
+	    case MS_SPEECH_LOG_INFO:
+            Logger->info(message);
+            break;
+	    case MS_SPEECH_LOG_DEBUG:
+            Logger->debug(message);
+            break;
+	    case MS_SPEECH_LOG_PARSER:
+            Logger->debug(fmt::format("parser: {0}", message));
+            break;
+	    case MS_SPEECH_LOG_HEADER:
+            Logger->debug(fmt::format("header: {0}", message));
+            break;
+	    case MS_SPEECH_LOG_EXT:
+            Logger->debug(fmt::format("ext: {0}", message));
+            break;
+	    case MS_SPEECH_LOG_CLIENT:
+            Logger->debug(fmt::format("client: {0}", message));
+            break;
+	    case MS_SPEECH_LOG_LATENCY:
+            Logger->debug(fmt::format("latency: {0}", message));
+            break;
+	    case MS_SPEECH_LOG_USER:
+            Logger->debug(fmt::format("user: {0}", message));
+            break;
+    }
 }
 
 void MSSpeechSessionFactory::msspeech_connection_established(ms_speech_connection_t connection, void *user_data)
@@ -174,7 +206,7 @@ void MSSpeechSessionFactory::msspeech_connection_established(ms_speech_connectio
         assert(factory->sessions.find(session) != factory->sessions.end());
     }
 
-    factory->log(MS_SPEECH_LOG_DEBUG, fmt::sprintf("msspeech_connection_established: %s", session->uri));
+    Logger->debug("msspeech_connection_established: {0}", session->uri);
 }
 
 void MSSpeechSessionFactory::msspeech_connection_error(ms_speech_connection_t connection, unsigned int http_status, const char *error_message, void *user_data)
@@ -186,7 +218,7 @@ void MSSpeechSessionFactory::msspeech_connection_error(ms_speech_connection_t co
         assert(factory->sessions.find(session) != factory->sessions.end());
     }
 
-    factory->log(MS_SPEECH_LOG_DEBUG, fmt::sprintf("msspeech_connection_error: %s: %d: %s", session->uri, http_status, error_message));
+    Logger->debug("{0}: msspeech_connection_error: {1}: {2}: {3}", session->requestId, session->uri, http_status, error_message);
 }
 
 void MSSpeechSessionFactory::msspeech_connection_closed(ms_speech_connection_t connection, void *user_data)
@@ -198,7 +230,7 @@ void MSSpeechSessionFactory::msspeech_connection_closed(ms_speech_connection_t c
         assert(factory->sessions.find(session) != factory->sessions.end());
     }
 
-    factory->log(MS_SPEECH_LOG_DEBUG, fmt::sprintf("msspeech_connection_closed: %s", session->uri));
+    Logger->debug("{0}: msspeech_connection_closed: {1}", session->requestId, session->uri);
     if (session->checkedOut) {
         // TODO: need to tell handlers about this.
     }
@@ -216,6 +248,8 @@ void MSSpeechSessionFactory::msspeech_client_ready(ms_speech_connection_t connec
     std::lock_guard<std::mutex> lock(factory->lock);
     assert(factory->sessions.find(session) != factory->sessions.end());
 
+    Logger->debug("msspeech_client_ready: {0}", session->uri);
+
     factory->availableSessionsByUri[session->uri].insert(session);
     factory->sessionCondition.notify_all();
 }
@@ -229,7 +263,7 @@ const char * MSSpeechSessionFactory::msspeech_provide_authentication_header(ms_s
         assert(factory->sessions.find(session) != factory->sessions.end());
     }
 
-    factory->log(MS_SPEECH_LOG_DEBUG, fmt::sprintf("msspeech_provide_authentication_header: %s", session->uri));
+    Logger->debug("{0}: msspeech_provide_authentication_header", session->requestId);
 
     static char buffer[1024];
     sprintf(buffer, "Ocp-Apim-Subscription-Key: %s", factory->msspeechSubscriptionKey.c_str());
@@ -250,7 +284,7 @@ void MSSpeechSessionFactory::msspeech_speech_startdetected(ms_speech_connection_
         assert(factory->busySesssions.find(session) != factory->busySesssions.end());
     }
 
-    factory->log(MS_SPEECH_LOG_DEBUG, fmt::sprintf("msspeech_speech_startdetected: %s", session->uri));
+    Logger->debug("{0}: msspeech_speech_startdetected", session->requestId);
     session->session->msspeechStartDetected(message);
 }
 
@@ -263,7 +297,7 @@ void MSSpeechSessionFactory::msspeech_speech_enddetected(ms_speech_connection_t 
         assert(factory->busySesssions.find(session) != factory->busySesssions.end());
     }
 
-    factory->log(MS_SPEECH_LOG_DEBUG, fmt::sprintf("msspeech_speech_enddetected: %s", session->uri));
+    Logger->debug("{0}: msspeech_speech_enddetected", session->requestId);
     session->session->msspeechEndDetected(message);
 }
 
@@ -276,7 +310,7 @@ void MSSpeechSessionFactory::msspeech_speech_hypothesis(ms_speech_connection_t c
         assert(factory->busySesssions.find(session) != factory->busySesssions.end());
     }
 
-    factory->log(MS_SPEECH_LOG_DEBUG, fmt::sprintf("msspeech_speech_hypothesis: %s", session->uri));
+    Logger->debug("{0}: msspeech_speech_hypothesis", session->requestId);
     session->session->msspeechHypothesis(message);
 }
 
@@ -289,7 +323,7 @@ void MSSpeechSessionFactory::msspeech_speech_fragment(ms_speech_connection_t con
         assert(factory->busySesssions.find(session) != factory->busySesssions.end());
     }
 
-    factory->log(MS_SPEECH_LOG_DEBUG, fmt::sprintf("msspeech_speech_fragment: %s", session->uri));
+    Logger->debug("{0}: msspeech_speech_fragment", session->requestId);
     session->session->msspeechFragment(message);
 }
 
@@ -302,7 +336,7 @@ void MSSpeechSessionFactory::msspeech_speech_result(ms_speech_connection_t conne
         assert(factory->busySesssions.find(session) != factory->busySesssions.end());
     }
 
-    factory->log(MS_SPEECH_LOG_DEBUG, fmt::sprintf("msspeech_result: %s", session->uri));
+    Logger->debug("{0}: msspeech_result", session->requestId);
     session->session->msspeechResult(message);
 }
 
@@ -315,7 +349,7 @@ void MSSpeechSessionFactory::msspeech_turn_start(ms_speech_connection_t connecti
         assert(factory->busySesssions.find(session) != factory->busySesssions.end());
     }
 
-    factory->log(MS_SPEECH_LOG_DEBUG, fmt::sprintf("msspeech_turn_start: %s", session->uri));
+    Logger->debug("{0}: msspeech_turn_start", session->requestId);
     session->session->msspeechTurnStart(message);
 }
 
@@ -328,18 +362,28 @@ void MSSpeechSessionFactory::msspeech_turn_end(ms_speech_connection_t connection
         assert(factory->busySesssions.find(session) != factory->busySesssions.end());
     }
 
-    factory->log(MS_SPEECH_LOG_DEBUG, fmt::sprintf("msspeech_turn_end: %s", session->uri));
+    Logger->debug("{0}: msspeech_turn_end", session->requestId);
     session->session->msspeechTurnEnd(message);
 }
 
 void MSSpeechSessionFactory::msspeech_log(ms_speech_connection_t connection, void *user_data, ms_speech_log_level_t level, const char *message)
 {
-    log(level, message);
+    auto session = static_cast<RecognitionSession *>(user_data);
+
+    auto m = fmt::format("{0}: {1}", session->requestId, message);
+    if (m.length() > 0 && m[m.length()-1] == '\n')
+        m = m.substr(0, m.length()-1);
+
+    log(level, m);
 }
 
 void MSSpeechSessionFactory::msspeech_global_log(ms_speech_log_level_t level, const char *message)
 {
-    log(level, message);
+    auto m = fmt::format("msspeech: {0}", message);
+    if (m.length() > 0 && m[m.length()-1] == '\n')
+        m = m.substr(0, m.length()-1);
+
+    log(level, m);
 }
 
 RecognitionSession::RecognitionSession()
