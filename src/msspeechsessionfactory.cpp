@@ -24,7 +24,7 @@ MSSpeechSessionFactory::~MSSpeechSessionFactory()
         this->stop();
 }
 
-MSSpeechSession * MSSpeechSessionFactory::getSession(const std::string &uri, const std::string &requestId)
+std::shared_ptr<MSSpeechSession> MSSpeechSessionFactory::getSession(const std::string &uri, const std::string &requestId)
 {
     Logger->info("{0}: session requested for {1}", requestId, uri);
 
@@ -44,7 +44,7 @@ MSSpeechSession * MSSpeechSessionFactory::getSession(const std::string &uri, con
     Logger->debug("{0}: got session for {1}", requestId, uri);
     auto session = *(this->availableSessionsByUri[uri].begin());
 
-    session->session = new MSSpeechSession(session->connection);
+    session->session = std::shared_ptr<MSSpeechSession>(new MSSpeechSession(session->connection));
     session->requestId = requestId;
     session->checkedOut = true;
     session->checkoutTime = std::time(NULL);
@@ -56,7 +56,7 @@ MSSpeechSession * MSSpeechSessionFactory::getSession(const std::string &uri, con
     return session->session;
 }
 
-void MSSpeechSessionFactory::putSession(MSSpeechSession *session)
+void MSSpeechSessionFactory::putSession(std::shared_ptr<MSSpeechSession> &session)
 {
     // TODO: track lifetime of connection
     std::lock_guard<std::mutex> lock(this->lock);
@@ -68,8 +68,7 @@ void MSSpeechSessionFactory::putSession(MSSpeechSession *session)
     Logger->debug("{0}: returning session for {1}", recoSession->requestId, recoSession->uri);
    
     this->sessionsBySession.erase(recoSession->session);
-    delete recoSession->session;
-    recoSession->requestId.clear();
+     recoSession->requestId.clear();
     recoSession->session = NULL;
     recoSession->checkedOut = false;
 
@@ -77,13 +76,14 @@ void MSSpeechSessionFactory::putSession(MSSpeechSession *session)
     this->sessionCondition.notify_all();
 }
 
-RecognitionSession * MSSpeechSessionFactory::createNewSession(const std::string &uri)
+std::shared_ptr<RecognitionSession> MSSpeechSessionFactory::createNewSession(const std::string &uri)
 {
-    auto session = new RecognitionSession();
+    std::shared_ptr<RecognitionSession> session(new RecognitionSession());
     session->connection = NULL;
     session->session = NULL;
     session->factory = this;
     session->uri = uri;
+    session->callbackData = NULL;
     this->pendingSessions.insert(session);
     ms_speech_service_cancel_step(this->msspeechContext);
 
@@ -142,7 +142,8 @@ void MSSpeechSessionFactory::processPendingSessions()
         for(auto pendingSession : pendingSessions) {
             ms_speech_connection_t connection;
             Logger->debug("starting connection to {0}", pendingSession->uri);
-            callbacks.user_data = pendingSession;
+            pendingSession->callbackData = new std::shared_ptr<RecognitionSession>(pendingSession);
+            callbacks.user_data = pendingSession->callbackData;
             int r = ms_speech_connect(this->msspeechContext, pendingSession->uri.c_str(), &callbacks, &connection);
             if (r) {
                 Logger->error("failed to create connection to {0}: {1}", pendingSession->uri, strerror(r));
@@ -199,7 +200,7 @@ void MSSpeechSessionFactory::log(ms_speech_log_level_t level, const std::string 
 
 void MSSpeechSessionFactory::msspeech_connection_established(ms_speech_connection_t connection, void *user_data)
 {
-    auto session = static_cast<RecognitionSession *>(user_data);
+    auto session = *static_cast<std::shared_ptr<RecognitionSession> *>(user_data);
     auto factory = session->factory;
     {
         std::lock_guard<std::mutex> lock(factory->lock);
@@ -211,7 +212,7 @@ void MSSpeechSessionFactory::msspeech_connection_established(ms_speech_connectio
 
 void MSSpeechSessionFactory::msspeech_connection_error(ms_speech_connection_t connection, unsigned int http_status, const char *error_message, void *user_data)
 {
-    auto session = static_cast<RecognitionSession *>(user_data);
+    auto session = *static_cast<std::shared_ptr<RecognitionSession> *>(user_data);
     auto factory = session->factory;
     {
         std::lock_guard<std::mutex> lock(factory->lock);
@@ -223,7 +224,7 @@ void MSSpeechSessionFactory::msspeech_connection_error(ms_speech_connection_t co
 
 void MSSpeechSessionFactory::msspeech_connection_closed(ms_speech_connection_t connection, void *user_data)
 {
-    auto session = static_cast<RecognitionSession *>(user_data);
+    auto session = *static_cast<std::shared_ptr<RecognitionSession> *>(user_data);
     auto factory = session->factory;
     {
         std::lock_guard<std::mutex> lock(factory->lock);
@@ -238,12 +239,11 @@ void MSSpeechSessionFactory::msspeech_connection_closed(ms_speech_connection_t c
     factory->availableSessionsByUri[session->uri].erase(session);
     factory->sessionsBySession.erase(session->session);
     factory->sessions.erase(session);
-    delete session;
 }
 
 void MSSpeechSessionFactory::msspeech_client_ready(ms_speech_connection_t connection, void *user_data)
 {
-    auto session = static_cast<RecognitionSession *>(user_data);
+    auto session = *static_cast<std::shared_ptr<RecognitionSession> *>(user_data);
     auto factory = session->factory;
     std::lock_guard<std::mutex> lock(factory->lock);
     assert(factory->sessions.find(session) != factory->sessions.end());
@@ -256,7 +256,7 @@ void MSSpeechSessionFactory::msspeech_client_ready(ms_speech_connection_t connec
 
 const char * MSSpeechSessionFactory::msspeech_provide_authentication_header(ms_speech_connection_t connection, void *user_data, size_t max_len)
 {
-    auto session = static_cast<RecognitionSession *>(user_data);
+    auto session = *static_cast<std::shared_ptr<RecognitionSession> *>(user_data);
     auto factory = session->factory;
     {
         std::lock_guard<std::mutex> lock(factory->lock);
@@ -277,7 +277,7 @@ void MSSpeechSessionFactory::msspeech_message_overlay(ms_speech_connection_t con
 
 void MSSpeechSessionFactory::msspeech_speech_startdetected(ms_speech_connection_t connection, ms_speech_startdetected_message_t *message, void *user_data)
 {
-    auto session = static_cast<RecognitionSession *>(user_data);
+    auto session = *static_cast<std::shared_ptr<RecognitionSession> *>(user_data);
     auto factory = session->factory;
     {
         std::lock_guard<std::mutex> lock(factory->lock);
@@ -290,7 +290,7 @@ void MSSpeechSessionFactory::msspeech_speech_startdetected(ms_speech_connection_
 
 void MSSpeechSessionFactory::msspeech_speech_enddetected(ms_speech_connection_t connection, ms_speech_enddetected_message_t *message, void *user_data)
 {
-    auto session = static_cast<RecognitionSession *>(user_data);
+    auto session = *static_cast<std::shared_ptr<RecognitionSession> *>(user_data);
     auto factory = session->factory;
     {
         std::lock_guard<std::mutex> lock(factory->lock);
@@ -303,7 +303,7 @@ void MSSpeechSessionFactory::msspeech_speech_enddetected(ms_speech_connection_t 
 
 void MSSpeechSessionFactory::msspeech_speech_hypothesis(ms_speech_connection_t connection, ms_speech_hypothesis_message_t *message, void *user_data)
 {
-    auto session = static_cast<RecognitionSession *>(user_data);
+    auto session = *static_cast<std::shared_ptr<RecognitionSession> *>(user_data);
     auto factory = session->factory;
     {
         std::lock_guard<std::mutex> lock(factory->lock);
@@ -316,7 +316,7 @@ void MSSpeechSessionFactory::msspeech_speech_hypothesis(ms_speech_connection_t c
 
 void MSSpeechSessionFactory::msspeech_speech_fragment(ms_speech_connection_t connection, ms_speech_fragment_message_t *message, void *user_data)
 {
-    auto session = static_cast<RecognitionSession *>(user_data);
+    auto session = *static_cast<std::shared_ptr<RecognitionSession> *>(user_data);
     auto factory = session->factory;
     {
         std::lock_guard<std::mutex> lock(factory->lock);
@@ -329,7 +329,7 @@ void MSSpeechSessionFactory::msspeech_speech_fragment(ms_speech_connection_t con
 
 void MSSpeechSessionFactory::msspeech_speech_result(ms_speech_connection_t connection, ms_speech_result_message_t *message, void *user_data)
 {
-    auto session = static_cast<RecognitionSession *>(user_data);
+    auto session = *static_cast<std::shared_ptr<RecognitionSession> *>(user_data);
     auto factory = session->factory;
     {
         std::lock_guard<std::mutex> lock(factory->lock);
@@ -342,7 +342,7 @@ void MSSpeechSessionFactory::msspeech_speech_result(ms_speech_connection_t conne
 
 void MSSpeechSessionFactory::msspeech_turn_start(ms_speech_connection_t connection, ms_speech_turn_start_message_t *message, void *user_data)
 {
-    auto session = static_cast<RecognitionSession *>(user_data);
+    auto session = *static_cast<std::shared_ptr<RecognitionSession> *>(user_data);
     auto factory = session->factory;
     {
         std::lock_guard<std::mutex> lock(factory->lock);
@@ -355,7 +355,7 @@ void MSSpeechSessionFactory::msspeech_turn_start(ms_speech_connection_t connecti
 
 void MSSpeechSessionFactory::msspeech_turn_end(ms_speech_connection_t connection, ms_speech_turn_end_message_t *message, void *user_data)
 {
-    auto session = static_cast<RecognitionSession *>(user_data);
+    auto session = *static_cast<std::shared_ptr<RecognitionSession> *>(user_data);
     auto factory = session->factory;
     {
         std::lock_guard<std::mutex> lock(factory->lock);
@@ -368,7 +368,7 @@ void MSSpeechSessionFactory::msspeech_turn_end(ms_speech_connection_t connection
 
 void MSSpeechSessionFactory::msspeech_log(ms_speech_connection_t connection, void *user_data, ms_speech_log_level_t level, const char *message)
 {
-    auto session = static_cast<RecognitionSession *>(user_data);
+    auto session = *static_cast<std::shared_ptr<RecognitionSession> *>(user_data);
 
     auto m = fmt::format("{0}: {1}", session->requestId, message);
     if (m.length() > 0 && m[m.length()-1] == '\n')
@@ -393,4 +393,10 @@ RecognitionSession::RecognitionSession()
     this->session = NULL;
     this->checkedOut = false;
     this->checkoutTime = std::time(NULL);
+    this->callbackData = NULL;
+}
+
+RecognitionSession::~RecognitionSession()
+{
+    delete this->callbackData;
 }

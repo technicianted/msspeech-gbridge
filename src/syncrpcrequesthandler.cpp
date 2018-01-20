@@ -2,7 +2,7 @@
 #include "msspeechsession.h"
 
 SyncRpcRequestHandler::SyncRpcRequestHandler(
-    MSSpeechSession *session, 
+    std::shared_ptr<MSSpeechSession> &session, 
     const MSSpeechRecoConfig &msspeechRecoConfig)
 {
     this->session = session;

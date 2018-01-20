@@ -26,7 +26,7 @@ class SyncRpcRequestHandler : public MSSpeechSessionHandler
 {
 public:
     SyncRpcRequestHandler(
-        MSSpeechSession *session, 
+        std::shared_ptr<MSSpeechSession> &session, 
         const MSSpeechRecoConfig &msspeechRecoConfig);
     ~SyncRpcRequestHandler();
 
@@ -42,7 +42,7 @@ public:
     void speechResult(ms_speech_result_message_t *message);
 
 private:
-    MSSpeechSession *session;
+    std::shared_ptr<MSSpeechSession> session;
     MSSpeechRecoConfig msspeechRecoConfig;
     ::google::cloud::speech::v1::RecognizeResponse* response;
 };

@@ -5,7 +5,7 @@
 
 StreamingRpcRequestHandler::StreamingRpcRequestHandler(
     std::shared_ptr<spdlog::logger> &logger,
-    MSSpeechSession *session, 
+    std::shared_ptr<MSSpeechSession> &session, 
     const MSSpeechRecoConfig &msspeechRecoConfig,
     ::grpc::internal::WriterInterface<::google::cloud::speech::v1::StreamingRecognizeResponse> *writer)
     : logger(logger)

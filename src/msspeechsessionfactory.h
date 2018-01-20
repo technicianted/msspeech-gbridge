@@ -62,13 +62,13 @@ public:
      * \param requestId request identification.
      * \return a speech session object.
      */ 
-    MSSpeechSession * getSession(const std::string &uri, const std::string &requestId);
+    std::shared_ptr<MSSpeechSession> getSession(const std::string &uri, const std::string &requestId);
     /**
      * \brief Returns back a session after usage.
      * 
      * \param session session object
      */
-    void putSession(MSSpeechSession *session);
+    void putSession(std::shared_ptr<MSSpeechSession> &session);
 
     /**
      * \brief Start object main run loop. Must be called before calling get().
@@ -85,18 +85,18 @@ private:
 
     std::string msspeechSubscriptionKey;
 
-    std::map<std::string, std::set<RecognitionSession *>> availableSessionsByUri;
-    std::set<RecognitionSession *> pendingSessions;
-    std::set<RecognitionSession *> busySesssions;
-    std::set<RecognitionSession *> sessions;
-    std::map<MSSpeechSession *, RecognitionSession *> sessionsBySession;
+    std::map<std::string, std::set<std::shared_ptr<RecognitionSession>>> availableSessionsByUri;
+    std::set<std::shared_ptr<RecognitionSession>> pendingSessions;
+    std::set<std::shared_ptr<RecognitionSession>> busySesssions;
+    std::set<std::shared_ptr<RecognitionSession>> sessions;
+    std::map<std::shared_ptr<MSSpeechSession>, std::shared_ptr<RecognitionSession>> sessionsBySession;
     ms_speech_context_t msspeechContext;
     std::thread runloopThread;
     bool terminateRunloop;
     bool runloopStarted;
     int maxSessions;
 
-    RecognitionSession * createNewSession(const std::string &uri);
+    std::shared_ptr<RecognitionSession> createNewSession(const std::string &uri);
     void processPendingSessions();
 
     static void log(ms_speech_log_level_t level, const std::string &message);
@@ -122,17 +122,20 @@ private:
 class RecognitionSession
 {
 public:
-RecognitionSession();
+    RecognitionSession();
+    ~RecognitionSession();
 
     MSSpeechSessionFactory *factory;
 
     std::string uri;
     std::string requestId;
     ms_speech_connection_t connection;
-    MSSpeechSession *session;
+    std::shared_ptr<MSSpeechSession> session;
 
     bool checkedOut;
     std::time_t checkoutTime;
+
+    std::shared_ptr<RecognitionSession> *callbackData;
 };
 
 #endif
