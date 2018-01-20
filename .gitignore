@@ -36,3 +36,5 @@ build/
 
 # google creds
 creds.json
+
+.vscode/
