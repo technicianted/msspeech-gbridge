@@ -1,6 +1,6 @@
 # msspeech-gbridge
 
-Service to allow using of unmodified [Google Speech](https://cloud.google.com/speech/docs/reference/libraries) client [SDKs](https://cloud.google.com/speech/docs/reference/libraries) to access Microsoft [Cognitive Services speech APIs](https://azure.microsoft.com/en-us/services/cognitive-services/speech/).
+Thin service to allow using of unmodified [Google Speech](https://cloud.google.com/speech/docs/reference/libraries) client [SDKs](https://cloud.google.com/speech/docs/reference/libraries) to access Microsoft [Cognitive Services speech APIs](https://azure.microsoft.com/en-us/services/cognitive-services/speech/).
 
 ## Why is it needed
 
